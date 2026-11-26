@@ -8,11 +8,10 @@ alias=${1:?expected an image alias}
 
 if [ "$alias" = latest ]; then
   git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
-  revision=$(git rev-parse refs/remotes/origin/main^{commit})
+  revision=$(git rev-parse 'refs/remotes/origin/main^{commit}')
 elif [[ "$alias" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   git fetch --tags --depth=1 origin
-  release=$(git tag --list "v$alias.*" --sort=-version:refname |
-    awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ && !selected { selected = $0 } END { print selected }')
+  release=$(git tag --list "v$alias.*" --sort=-version:refname | awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ && !selected { selected = $0 } END { print selected }')
   test -n "$release"
   revision=$(git rev-parse "$release^{commit}")
 else
