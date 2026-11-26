@@ -97,7 +97,8 @@ def main() -> None:
     assert trigger["workflow_run"] == {"workflows": [workflow["name"]], "types": ["completed"]}
     assert set(promotion["jobs"]) == {"promote"}
     assert "conclusion == 'success'" in promotion["jobs"]["promote"]["if"]
-    assert promotion["concurrency"] == {"group": "zoekt-container-aliases", "cancel-in-progress": False}
+    assert "concurrency" not in promotion
+    assert promotion["jobs"]["promote"]["concurrency"] == {"group": "zoekt-container-aliases", "cancel-in-progress": False}
     assert all("build-push-action" not in step.get("uses", "") for step in promotion["jobs"]["promote"]["steps"])
     assert promotion["jobs"]["promote"]["steps"][-1]["run"].endswith(" all")
     plan = next(step["run"] for step in workflow["jobs"]["merge"]["steps"] if step.get("id") == "publication")
