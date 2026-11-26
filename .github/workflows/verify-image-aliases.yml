@@ -1,4 +1,4 @@
-name: Verify image publication without registry writes
+name: Verify image aliases in a disposable registry
 on:
   push:
     branches: ['ci/verify-image-aliases-20261126-r7']
@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: df8dc04b17a32f9daee6e231bc68c7230a7a8090
+          ref: b44a9ee89d58c6367dcd895b9b8b85d91b4d1136
           path: source
       - uses: actions/checkout@v4
         with:
@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           export GOENV=off GOCACHEPROG='' GOMAXPROCS=2 GOFLAGS=-p=1
-          test "$(git rev-parse HEAD)" = df8dc04b17a32f9daee6e231bc68c7230a7a8090
-          test "$(git rev-parse HEAD^{tree})" = 0a751541c1c999e52a8a67f3d9ceecbacc88ee09
+          test "$(git rev-parse HEAD)" = b44a9ee89d58c6367dcd895b9b8b85d91b4d1136
+          test "$(git rev-parse HEAD^{tree})" = bace056f4b5ab0ff170b0246f0483d4a0efa66bc
           git rev-parse HEAD HEAD^{tree}
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends shellcheck shfmt
