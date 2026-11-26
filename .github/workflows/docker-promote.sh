@@ -22,9 +22,8 @@ if [ "$alias" != all ] && [ "$alias" != latest ] && ! [[ "$alias" =~ ^(0|[1-9][0
   exit 1
 fi
 
-git fetch --no-tags --depth=1 --refmap= origin refs/heads/main
-main_revision=$(git rev-parse 'FETCH_HEAD^{commit}')
-git fetch --no-tags --depth=1 --refmap= origin 'refs/tags/v*:refs/tags/v*'
+git fetch --no-tags --depth=1 --refmap= origin '+refs/heads/main:refs/remotes/origin/main' 'refs/tags/v*:refs/tags/v*'
+main_revision=$(git rev-parse 'refs/remotes/origin/main^{commit}')
 releases=$(
   git tag --list --sort=refname 'v*' \
     | awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/ { core=$0; sub(/\+.*/, "", core); print core "\t" $0 }' \
