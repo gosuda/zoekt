@@ -53,6 +53,15 @@ for alias in "${aliases[@]}"; do
     revision=$(git rev-parse "$release^{commit}")
     if { [ "$alias" = latest ] && [ "$revision" = "$main_revision" ]; } || [[ "$release" = v"$alias".* ]]; then
       targets+=("$(source_tag "refs/tags/$release" "$revision")")
+      if git grep -Fq '.github/workflows/docker-promote.sh source-tag' "$revision" -- .github/workflows/docker.yml; then
+        :
+      else
+        status=$?
+        [ "$status" -eq 1 ] || exit "$status"
+        # Historical workflows publish the SemVer core tag without a source address.
+        version=${release#v}
+        targets+=("${version%%+*}:$revision")
+      fi
     fi
   done <<<"$releases"
   if [ "$alias" = latest ]; then
@@ -60,10 +69,24 @@ for alias in "${aliases[@]}"; do
   fi
 
   digest=
-  for target in "${targets[@]}"; do
+  for candidate in "${targets[@]}"; do
+    IFS=: read -r target legacy_revision <<<"$candidate"
     source="$IMAGE:$target"
     if docker buildx imagetools inspect "$source" --format '{{json .Manifest}}' >"$manifest" 2>"$errors"; then
       digest=$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' "$manifest")
+      if [ -n "$legacy_revision" ]; then
+        docker buildx imagetools inspect "$IMAGE@$digest" --format '{{json .Image}}' >"$temporary/config.json"
+        if ! jq -e --arg revision "$legacy_revision" --arg version "$target" '
+          (if has("config") then [.] else [.[]] end)
+          | length > 0 and all(.[];
+              .config.Labels["org.opencontainers.image.revision"] == $revision
+              and .config.Labels["org.opencontainers.image.version"] == $version)
+        ' "$temporary/config.json" >/dev/null; then
+          printf 'The legacy index %s does not match its release; skipping.\n' "$target"
+          digest=
+          continue
+        fi
+      fi
       break
     else
       status=$?
