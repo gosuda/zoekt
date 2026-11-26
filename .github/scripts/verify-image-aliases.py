@@ -253,6 +253,19 @@ def main() -> None:
         assert alias_digest("latest") == future_minor3
         records.append({"case": "numeric build metadata is accepted without promoting off-main releases to latest", "result": "pass"})
 
+        git(writer, "tag", "v1.4.3+999", metadata)
+        git(writer, "push", "origin", "--tags")
+        alternate_metadata = publish_fixture(metadata, "refs/tags/v1.4.3+999", "1.4.3+999")
+        git(consumer, "config", "--local", "--", "tag.sort", "-refname")
+        old_order_script = root / "ambient-tag-order.sh"
+        assert script.read_text().count("--sort=refname ") == 1
+        old_order_script.write_text(script.read_text().replace("--sort=refname ", ""))
+        command(["bash", str(old_order_script), "1.4"], consumer, environment)
+        assert alias_digest("1.4") == alternate_metadata
+        command(["bash", str(script), "1.4"], consumer, environment)
+        assert alias_digest("1.4") == metadata_higher
+        records.append({"case": "equal-precedence metadata ties ignore ambient Git tag sorting", "result": "red/green verified"})
+
         git(writer, "checkout", "main")
         git(writer, "merge", "--ff-only", "metadata")
         git(writer, "push", "origin", "main")

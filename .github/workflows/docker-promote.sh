@@ -26,10 +26,10 @@ git fetch --no-tags --depth=1 --refmap= origin refs/heads/main
 main_revision=$(git rev-parse 'FETCH_HEAD^{commit}')
 git fetch --no-tags --depth=1 --refmap= origin 'refs/tags/v*:refs/tags/v*'
 releases=$(
-  git tag --list 'v*' |
-    awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/ { core=$0; sub(/\+.*/, "", core); print core "\t" $0 }' |
-    LC_ALL=C sort -s -k1,1Vr |
-    cut -f2-
+  git tag --list --sort=refname 'v*' \
+    | awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/ { core=$0; sub(/\+.*/, "", core); print core "\t" $0 }' \
+    | LC_ALL=C sort -s -k1,1Vr \
+    | cut -f2-
 )
 
 aliases=("$alias")
