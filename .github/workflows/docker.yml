@@ -11,6 +11,10 @@ on:
 env:
   IMAGE: ghcr.io/${{ github.repository }}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # Each architecture builds on its own runner. Under QEMU the arm64 ctags
   # build took 14 minutes; natively it takes under a minute.
@@ -19,9 +23,9 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runner: ubuntu-latest
+            runner: depot-ubuntu-24.04
           - arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: depot-ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
@@ -91,7 +95,7 @@ jobs:
 
   merge:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
