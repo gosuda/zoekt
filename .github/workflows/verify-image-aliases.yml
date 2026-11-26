@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: b44a9ee89d58c6367dcd895b9b8b85d91b4d1136
+          ref: 310a9a216bfff5f756dd05b3857fe0d60cd9ce0d
           path: source
       - uses: actions/checkout@v4
         with:
@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           export GOENV=off GOCACHEPROG='' GOMAXPROCS=2 GOFLAGS=-p=1
-          test "$(git rev-parse HEAD)" = b44a9ee89d58c6367dcd895b9b8b85d91b4d1136
-          test "$(git rev-parse HEAD^{tree})" = bace056f4b5ab0ff170b0246f0483d4a0efa66bc
+          test "$(git rev-parse HEAD)" = 310a9a216bfff5f756dd05b3857fe0d60cd9ce0d
+          test "$(git rev-parse HEAD^{tree})" = 9e86efe43862c817f7552d58a63501c95765ad75
           git rev-parse HEAD HEAD^{tree}
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends shellcheck shfmt

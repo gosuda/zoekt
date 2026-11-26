@@ -7,10 +7,10 @@ alias=${1:?expected an image alias}
 : "${RUNNER_TEMP:?expected runner scratch}"
 
 if [ "$alias" = latest ]; then
-  git fetch --no-tags --depth=1 origin refs/heads/main:refs/remotes/origin/main
-  revision=$(git rev-parse 'refs/remotes/origin/main^{commit}')
+  git fetch --no-tags --depth=1 --refmap= origin refs/heads/main
+  revision=$(git rev-parse 'FETCH_HEAD^{commit}')
 elif [[ "$alias" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-  git fetch --tags --depth=1 origin
+  git fetch --no-tags --depth=1 --refmap= origin 'refs/tags/v*:refs/tags/v*'
   release=$(git tag --list "v$alias.*" --sort=-version:refname | awk '/^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/ && !selected { selected = $0 } END { print selected }')
   test -n "$release"
   revision=$(git rev-parse "$release^{commit}")
