@@ -56,4 +56,5 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: bufbuild/buf-breaking-action@c57b3d842a5c3f3b454756ef65305a50a587c5ba # v1.1.4
         with:
-          against: 'https://github.com/sourcegraph/zoekt.git#branch=main'
+          input: grpc/protos
+          against: 'https://github.com/sourcegraph/zoekt.git#branch=main,subdir=grpc/protos'
