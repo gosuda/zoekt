@@ -8,6 +8,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 import yaml
 
@@ -151,8 +152,25 @@ def main() -> None:
             assert alias_digest(alias) == current_digest
         records.append({"case": "unbuilt newer targets retain both published aliases", "result": "pass"})
 
+        git(writer, "tag", "v1.3.0", current)
+        git(writer, "tag", "v1.3.1", future)
+        git(writer, "push", "origin", "--tags")
+        previous_script = root / "previous-promotion.sh"
+        previous_script.write_text(git(source, "show", "310a9a216bfff5f756dd05b3857fe0d60cd9ce0d:.github/workflows/docker-promote.sh") + "\n")
+        previous_output = command(["bash", str(previous_script), "1.3"], consumer, environment)
+        assert "no published index yet" in previous_output
+        try:
+            alias_digest("1.3")
+        except HTTPError as error:
+            assert error.code == 404
+        else:
+            raise AssertionError("the previous implementation unexpectedly published the first minor alias")
+        command(["bash", str(script), "1.3"], consumer, environment)
+        assert alias_digest("1.3") == current_digest
+        records.append({"case": "unbuilt newer tag cannot suppress the first published minor alias", "result": "red/green verified"})
+
         future_digest = publish_fixture(future)
-        for alias in ("latest", "1.2"):
+        for alias in ("latest", "1.2", "1.3"):
             command(["bash", str(script), alias], consumer, environment)
             assert alias_digest(alias) == future_digest
         records.append({"case": "older coalescing worker promotes newly published current targets", "digest": future_digest})
