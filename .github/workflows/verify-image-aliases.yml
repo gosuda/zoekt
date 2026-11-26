@@ -1,0 +1,73 @@
+name: Verify image aliases in a disposable registry
+on:
+  push:
+    branches: ['ci/verify-image-aliases-20261126-r7']
+    paths:
+      - .github/workflows/verify-image-aliases.yml
+      - .github/scripts/verify-image-aliases.py
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b67840c3802cb68856090e06b7513296afda347d
+          path: source
+      - uses: actions/checkout@v4
+        with:
+          path: proof
+          sparse-checkout: .github/scripts/verify-image-aliases.py
+          sparse-checkout-cone-mode: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version: '1.27.4'
+          cache: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d
+        with:
+          enable-cache: false
+          python-version: '3.12'
+      - name: Validate exact workflow and shell sources
+        run: |
+          set -euo pipefail
+          export GOENV=off GOCACHEPROG='' GOMAXPROCS=2 GOFLAGS=-p=1
+          test "$(git rev-parse HEAD)" = b67840c3802cb68856090e06b7513296afda347d
+          test "$(git rev-parse HEAD^{tree})" = d3c667ae3e51f03bf9082ecd40bc01de3470b9dd
+          git rev-parse HEAD HEAD^{tree}
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt
+          GOBIN="$RUNNER_TEMP/bin" go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$RUNNER_TEMP/bin/actionlint" -config-file .github/actionlint.yaml .github/workflows/docker.yml .github/workflows/docker-promote.yml
+          shellcheck .github/workflows/docker-promote.sh
+          shfmt -d -i 2 -ci -bn .github/workflows/docker-promote.sh
+          git diff --check
+          git diff --exit-code
+      - name: Start a disposable local registry
+        run: |
+          set -euo pipefail
+          docker run -d --name zoekt-alias-proof -p 127.0.0.1:5000:5000 registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+          docker image inspect registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373 --format '{{json .RepoDigests}}'
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5000/v2/; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Prove version publication and alias convergence
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 7f5ffc0c1e29d9312e1494073500aaaf68b3e062
+          uv run --no-project --with pyyaml python ../proof/.github/scripts/verify-image-aliases.py
+          git diff --exit-code
+      - name: Remove the disposable registry
+        if: always()
+        run: |
+          if docker container inspect zoekt-alias-proof >/dev/null 2>&1; then
+            docker rm -f zoekt-alias-proof
+          fi
