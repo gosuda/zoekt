@@ -124,6 +124,15 @@ def main() -> None:
         output = root / "outputs"
         environment = {**os.environ, "IMAGE": IMAGE, "RUNNER_TEMP": str(root), "GITHUB_OUTPUT": str(output)}
 
+        no_tags_baseline = root / "no-tags-baseline.sh"
+        no_tags_baseline.write_text(git(source, "show", "32d61f7d3110081f837097e01ee05ec80aeed6e1:.github/workflows/docker-promote.sh") + "\n")
+        red = subprocess.run(["bash", "-x", str(no_tags_baseline), "all"], cwd=consumer, env=environment, capture_output=True, text=True, check=False)
+        print(f"NO TAGS BASELINE: exit {red.returncode}")
+        print(red.stderr)
+        assert red.returncode == 1, red.stderr
+        assert red.stderr.rstrip().endswith("+ git fetch --no-tags --depth=1 --refmap= origin 'refs/tags/v*:refs/tags/v*'"), red.stderr
+        records.append({"case": "separate unmatched tag fetch fails before first release", "result": "red reproduced"})
+
         first_digest = publish_fixture(first, "refs/heads/main", "development-first")
         command(["bash", str(script), "all"], consumer, environment)
         assert alias_digest("latest") == first_digest

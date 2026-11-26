@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 32d61f7d3110081f837097e01ee05ec80aeed6e1
+          ref: b7179d75daa2bea1880cdccbfda51897130992cd
           path: source
       - uses: actions/checkout@v4
         with:
@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
           export GOENV=off GOCACHEPROG='' GOMAXPROCS=2 GOFLAGS=-p=1
-          test "$(git rev-parse HEAD)" = 32d61f7d3110081f837097e01ee05ec80aeed6e1
-          test "$(git rev-parse HEAD^{tree})" = 0be6126036756adaa97aaf849f1c3243033e6276
+          test "$(git rev-parse HEAD)" = b7179d75daa2bea1880cdccbfda51897130992cd
+          test "$(git rev-parse HEAD^{tree})" = 7744a064ab5669d54e9f656c57faefec21b5a2cd
           git rev-parse HEAD HEAD^{tree}
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends shellcheck shfmt
@@ -62,7 +62,7 @@ jobs:
       - name: Prove version publication and alias convergence
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin 7f5ffc0c1e29d9312e1494073500aaaf68b3e062
+          git fetch --no-tags --depth=1 origin 7f5ffc0c1e29d9312e1494073500aaaf68b3e062 32d61f7d3110081f837097e01ee05ec80aeed6e1
           uv run --no-project --with pyyaml python ../proof/.github/scripts/verify-image-aliases.py
           git diff --exit-code
       - name: Remove the disposable registry
