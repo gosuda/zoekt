@@ -45,7 +45,7 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       # The image labels, including org.opencontainers.image.version, come from
-      # these tags, so keep them the same as the merge job's.
+      # the same immutable version rules as the merge job.
       - name: docker-meta
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -53,9 +53,7 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=${{ steps.version.outputs.value }},enable={{is_default_branch}}
-            type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,format=short
 
       - name: login to ghcr.io
@@ -97,10 +95,8 @@ jobs:
     needs: build
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 10
-    concurrency:
-      group: zoekt-container-publication
-      queue: max
-      cancel-in-progress: false
+    outputs:
+      aliases: ${{ steps.publication.outputs.aliases }}
     permissions:
       contents: read
       packages: write
@@ -124,17 +120,18 @@ jobs:
       - name: setup-buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Check latest promotion while holding the publication slot
-        id: promotion
+      - name: publication targets
+        id: publication
+        shell: bash
         run: |
           set -euo pipefail
-          git fetch origin refs/heads/main:refs/remotes/origin/main
-          current_main=$(git rev-parse refs/remotes/origin/main)
-          if [ "$GITHUB_REF" = refs/heads/main ] && [ "$GITHUB_SHA" = "$current_main" ]; then
-            printf 'current_main=true\n' >> "$GITHUB_OUTPUT"
-          else
-            printf 'current_main=false\n' >> "$GITHUB_OUTPUT"
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          aliases='["latest"]'
+          if [[ "$GITHUB_REF" =~ ^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            minor="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            aliases=$(jq -cn --arg minor "$minor" '["latest", $minor]')
           fi
+          printf 'aliases=%s\n' "$aliases" >> "$GITHUB_OUTPUT"
 
       - name: docker-meta
         id: meta
@@ -144,9 +141,8 @@ jobs:
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=${{ steps.version.outputs.value }},enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ steps.promotion.outputs.current_main == 'true' }}
+            type=raw,value=commit-${{ steps.publication.outputs.commit }},priority=50
             type=sha,prefix=sha-,format=short
 
       - name: login to ghcr.io
@@ -168,3 +164,40 @@ jobs:
 
       - name: inspect
         run: docker buildx imagetools inspect "$(jq -r '.tags[0]' <<<"$DOCKER_METADATA_OUTPUT_JSON")"
+
+  promote:
+    needs: merge
+    runs-on: depot-ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        alias: ${{ fromJSON(needs.merge.outputs.aliases) }}
+    concurrency:
+      group: zoekt-container-alias-${{ matrix.alias }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: checkout promotion script
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          filter: blob:none
+          sparse-checkout: .github/workflows/docker-promote.sh
+          sparse-checkout-cone-mode: false
+
+      - name: setup-buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: login to ghcr.io
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote the current published target
+        env:
+          IMAGE_ALIAS: ${{ matrix.alias }}
+        run: bash .github/workflows/docker-promote.sh "$IMAGE_ALIAS"
